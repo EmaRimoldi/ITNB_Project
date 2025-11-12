@@ -26,7 +26,7 @@ GROUNDX_API_KEY = os.getenv('GROUNDX_API_KEY')
 GROUNDX_BUCKET_ID = int(os.getenv('GROUNDX_BUCKET_ID'))
 
 # LLM Configuration (as specified in assessment)
-OPENAI_MODEL_NAME = os.getenv('OPENAI_MODEL_NAME', 'inference-llama4-maverick')
+Il OPENAI_MODEL_NAME = os.getenv('OPENAI_MODEL_NAME', 'inference-llama4-maverick')
 OPENAI_API_BASE = os.getenv('OPENAI_API_BASE', 'https://maas.ai-2.kvant.cloud')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 

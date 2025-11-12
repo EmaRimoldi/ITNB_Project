@@ -50,12 +50,15 @@ pip install groundx python-dotenv requests beautifulsoup4
    GROUNDX_BUCKET_ID=your_bucket_id_here
    
    # LLM Credentials (for query and chat functions)
-   OPENAI_MODEL_NAME=openai/inference-llama4-maverick
+   OPENAI_MODEL_NAME=inference-llama4-maverick
    OPENAI_API_BASE=https://maas.ai-2.kvant.cloud
    OPENAI_API_KEY=sk-K_lZO2Ms6cRWurIj8gf5sg
    ```
 
-**Note:** The LLM credentials are provided as part of the ITNB assessment and are used for query/chat functionality with GroundX.
+**Note:** The LLM credentials are provided as part of the ITNB assessment. The chat interface uses these credentials to:
+1. Search GroundX for relevant context (RAG retrieval)
+2. Send the context to the custom LLM endpoint for answer generation
+3. Display human-like responses based on the retrieved content
 
 ## Complete End-to-End Execution Guide
 
@@ -175,7 +178,27 @@ Start the headless command-line chat interface to query the ingested content:
 python chat.py
 ```
 
-The chat interface allows unlimited natural language queries about ITNB content with relevance scoring and source attribution. Type `exit` or `quit` to exit gracefully.
+The chat interface uses a two-stage RAG pipeline:
+1. **Retrieval**: GroundX searches indexed documents for relevant context
+2. **Generation**: Custom LLM endpoint (`inference-llama4-maverick`) generates human-like answers
+
+**Example interaction:**
+```
+💬 You: What is ITNB?
+
+🔍 Searching...
+
+✅ ANSWER
+ITNB AG is a company that specializes in delivering secure and scalable 
+solutions tailored to business needs, with a focus on AI, Cybersecurity, 
+and Sovereign Cloud...
+
+📊 Relevance Score: 305.13
+📄 Results Found: 16
+🔗 Source: https://console.itnb.ch/en/dashboard
+```
+
+Type `exit` or `quit` to exit gracefully.
 
 ## Technical Architecture
 
@@ -198,11 +221,25 @@ The chat interface allows unlimited natural language queries about ITNB content 
 └──────────────────────┬──────────────────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────────────────┐
-│ 3. RETRIEVAL & Q&A LAYER (chat.py)                             │
-│    - API: GroundX Search (client.search.content())             │
-│    - Input: User natural language queries                      │
-│    - Output: Relevance-ranked results with source URLs        │
-│    - Interface: Interactive headless CLI                       │
+│ 3. RETRIEVAL LAYER (chat.py - GroundX Search)                  │
+│    - API: client.search.content()                              │
+│    - Input: User natural language query                        │
+│    - Output: Relevant context chunks (search.text)             │
+└──────────────────────┬──────────────────────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────────────────┐
+│ 4. GENERATION LAYER (chat.py - Custom LLM)                     │
+│    - Endpoint: https://maas.ai-2.kvant.cloud                   │
+│    - Model: inference-llama4-maverick                          │
+│    - Input: Context + User query                               │
+│    - Output: Human-like answer with citations                  │
+└──────────────────────┬──────────────────────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────────────────┐
+│ 5. OUTPUT (Interactive CLI)                                    │
+│    - Formatted answer                                          │
+│    - Relevance score                                           │
+│    - Source URLs                                               │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
