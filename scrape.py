@@ -175,6 +175,33 @@ class ITNBScraper:
             # Extract sections and paragraphs
             self._extract_sections_and_paragraphs(url, soup, page_data["id"] if page_data else None)
             
+            # === RECURSIVE CRAWLING ===
+            # Find and follow all internal links on this page
+            # This is what enables multi-page scraping
+            if depth < max_depth:
+                # Find all anchor tags with href attributes
+                for link in soup.find_all('a', href=True):
+                    # Get the href value (could be relative or absolute URL)
+                    href = link.get('href')
+                    
+                    # Convert relative URLs to absolute URLs
+                    # e.g., "/en/about" becomes "https://www.itnb.ch/en/about"
+                    absolute_url = urljoin(url, href)
+                    
+                    # Parse URL to check if it's from same domain
+                    parsed_url = urlparse(absolute_url)
+                    parsed_base = urlparse(self.base_url)
+                    
+                    # Only follow links that:
+                    # 1. Are from the same domain (no external links)
+                    # 2. Haven't been visited yet
+                    # 3. Are HTTP/HTTPS (not mailto:, tel:, javascript:, etc.)
+                    if (parsed_url.netloc == parsed_base.netloc and 
+                        absolute_url not in self.visited_urls and
+                        parsed_url.scheme in ['http', 'https']):
+                        # Recursively scrape the linked page
+                        self._scrape_page(absolute_url, depth + 1, max_depth)
+            
         except Exception as e:
             print(f"  ✗ Error scraping {url}: {str(e)}")
     
