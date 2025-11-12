@@ -2,12 +2,13 @@
 GroundX Chat Interface Module
 
 Provides an interactive command-line Q&A interface for querying ingested ITNB content.
-Demonstrates RAG capabilities by retrieving and displaying contextual answers with sources.
+Demonstrates RAG capabilities by retrieving contextual answers and generating LLM responses.
 """
 
 import os
 import logging
 import sys
+import requests
 from groundx import GroundX
 from dotenv import load_dotenv
 
@@ -25,32 +26,89 @@ GROUNDX_API_KEY = os.getenv('GROUNDX_API_KEY')
 GROUNDX_BUCKET_ID = int(os.getenv('GROUNDX_BUCKET_ID'))
 
 # LLM Configuration (as specified in assessment)
-OPENAI_MODEL_NAME = os.getenv('OPENAI_MODEL_NAME', 'openai/inference-llama4-maverick')
+OPENAI_MODEL_NAME = os.getenv('OPENAI_MODEL_NAME', 'inference-llama4-maverick')
 OPENAI_API_BASE = os.getenv('OPENAI_API_BASE', 'https://maas.ai-2.kvant.cloud')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 
+def generate_llm_response(context, query):
+    """
+    Generate LLM completion using custom OpenAI-compatible endpoint.
+    
+    Args:
+        context (str): Retrieved context from GroundX search
+        query (str): User's original question
+        
+    Returns:
+        str: LLM-generated response or None on error
+    """
+    try:
+        headers = {
+            "Authorization": f"Bearer {OPENAI_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": OPENAI_MODEL_NAME,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": f"""You are a helpful assistant that answers questions using the provided context.
+Use the following information to answer the user's question accurately:
+
+===
+{context}
+===
+
+Provide a clear, concise answer based only on the information above. If the context doesn't contain enough information, say so."""
+                },
+                {
+                    "role": "user",
+                    "content": query
+                }
+            ],
+            "temperature": 0.7,
+            "max_tokens": 500
+        }
+        
+        logger.info(f"Calling LLM: {OPENAI_MODEL_NAME} at {OPENAI_API_BASE}")
+        
+        response = requests.post(
+            f"{OPENAI_API_BASE}/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            return result['choices'][0]['message']['content']
+        else:
+            logger.error(f"LLM API error: {response.status_code} - {response.text}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Error generating LLM response: {str(e)}")
+        return None
+
+
 def search_and_display(query):
     """
-    Search GroundX bucket and display results in professional format.
-    Uses custom LLM endpoint as specified in assessment requirements.
+    Search GroundX bucket, retrieve context, and generate LLM response.
     
     Args:
         query (str): User's question or search query
         
     Returns:
-        bool: True if search succeeded with results, False otherwise
+        bool: True if search and generation succeeded, False otherwise
     """
     # Initialize GroundX client
     client = GroundX(api_key=GROUNDX_API_KEY)
     
     try:
         logger.info(f"Query: {query}")
-        logger.info(f"Using LLM: {OPENAI_MODEL_NAME} at {OPENAI_API_BASE}")
         
-        # Search the bucket with custom LLM configuration
-        # Note: GroundX may use its internal LLM for semantic search,
-        # but we're configured to use the specified OpenAI-compatible endpoint
+        # Search the bucket with GroundX
         response = client.search.content(
             id=GROUNDX_BUCKET_ID,
             query=query
@@ -82,20 +140,28 @@ def search_and_display(query):
                 logger.warning(f"Low relevance score ({search_data.score:.2f}) for query: {query}")
                 return False
             
+            # Extract context from GroundX search results
+            context = search_data.text if search_data.text else ""
+            
+            # Generate LLM response using custom endpoint
+            llm_response = generate_llm_response(context, query)
+            
             # Display results header
             print("\n" + "=" * 80)
-            print("✅ ANSWER FOUND")
+            print("✅ ANSWER")
             print("=" * 80)
             
-            # Display answer (LLM-optimized text)
+            # Display LLM-generated answer
             print("")
-            if search_data.text:
-                answer_text = search_data.text
-                # Limit output for readability
-                if len(answer_text) > 1500:
-                    print(answer_text[:1500] + "\n\n[... answer truncated for readability ...]")
+            if llm_response:
+                print(llm_response)
+            elif context:
+                # Fallback to raw context if LLM fails
+                logger.warning("LLM generation failed, showing raw context")
+                if len(context) > 1500:
+                    print(context[:1500] + "\n\n[... answer truncated for readability ...]")
                 else:
-                    print(answer_text)
+                    print(context)
             else:
                 print("No detailed answer available.")
             
