@@ -175,57 +175,7 @@ Start the headless command-line chat interface to query the ingested content:
 python chat.py
 ```
 
-**Interactive Session Example:**
-
-```
-================================================================================
-ITNB Q&A SYSTEM
-================================================================================
-Type 'exit' or 'quit' to quit. Ctrl+C to force exit.
-
-Query 1: What is ITNB?
-Results found: 20
-Relevance Score: 306.07
-Source: https://console.itnb.ch/en/dashboard
-Answer: At ITNB AG, we are redefining the future of AI and Cybersecurity...
-
-Query 2: Tell me about ITNB's services
-Results found: 20
-Relevance Score: 261.23
-Source: www.itnb.ch/en/products-and-services/professional-services/project-management
-Answer: Project Management: Achieve project success with customized expertise...
-
-Query 3: What is the Sovereign Orchestrator?
-Results found: 11
-Relevance Score: 286.36
-Source: www.itnb.ch/en/products-and-services/software-as-a-service/sovereign-orchestrator
-Answer: Sovereign Orchestrator is a Swiss-engineered, privately hosted platform...
-
-Query 4: exit
-```
-
-**Features:**
-- Unlimited queries per session
-- Professional, structured output
-- Relevance scoring for result quality
-- Source URL attribution
-- Type `exit` or `quit` to quit gracefully
-- Press `Ctrl+C` for forced exit
-
----
-
-### Summary: Pipeline Verification
-
-✅ **Step 1**: Activate environment  
-✅ **Step 2**: Scrape content (optional reference)  
-✅ **Step 3**: Ingest into GroundX (asynchronous, note Process ID)  
-✅ **Step 4**: Check status until "complete" (41 documents)  
-✅ **Step 5**: Run chat and test multiple queries  
-
-**Expected Results:**
-- Ingestion: 41 documents successfully processed
-- Q&A: All queries return relevant results with source URLs
-- Performance: Responses under 2 seconds per query
+The chat interface allows unlimited natural language queries about ITNB content with relevance scoring and source attribution. Type `exit` or `quit` to exit gracefully.
 
 ## Technical Architecture
 
@@ -256,16 +206,7 @@ Query 4: exit
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Core Technologies
-
-- **GroundX**: RAG platform for semantic search and retrieval
-- **BeautifulSoup4**: HTML parsing and text extraction
-- **Python 3.14**: Latest Python version with async support
-- **Logging**: Structured logging with timestamps across all modules
-
 ---
-
-## Stage 2: Theoretical Design Questions & Answers
 
 ## Stage 2: Theoretical Design Questions & Answers
 
@@ -418,28 +359,6 @@ This architecture scales to **millions of documents** while maintaining sub-seco
 ### Documentation
 - [x] `README.md` - Complete with setup, usage, and design answers
 - [x] This file includes 2000+ words of architectural guidance
-
-### Functionality
-- [x] Website crawling from https://www.itnb.ch/en
-- [x] Semantic content ingestion (41 documents)
-- [x] Interactive Q&A with relevance scoring
-- [x] Professional output formatting
-- [x] Structured logging across all modules
-- [x] Error handling and user-friendly messages
-
----
-
-## Tech Stack Summary
-
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| Language | Python 3.14 | Modern, async-capable |
-| RAG Platform | GroundX | Semantic search and retrieval |
-| HTML Parsing | BeautifulSoup4 | Website content extraction |
-| HTTP Client | Requests | API communication |
-| Configuration | python-dotenv | Secure credential management |
-| Logging | Python logging | Structured event tracking |
-| CLI | Built-in | Interactive chat interface |
 
 ---
 
