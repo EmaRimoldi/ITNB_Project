@@ -183,26 +183,26 @@ The chat interface allows unlimited natural language queries about ITNB content 
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ 1. SCRAPING LAYER (scrape.py)                                  │
-│    - URL: https://www.itnb.ch/en                               │
-│    - Tool: BeautifulSoup4 (HTML parsing)                       │
-│    - Output: scraped_data/itnb_content.json                    │
+│ 1. SCRAPING LAYER (scrape.py)                                   │
+│    - URL: https://www.itnb.ch/en                                │
+│    - Tool: BeautifulSoup4 (HTML parsing)                        │
+│    - Output: scraped_data/itnb_content.json                     │
 └──────────────────────┬──────────────────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────────────────┐
-│ 2. INGESTION LAYER (ingest.py)                                 │
-│    - Service: GroundX Official SDK                             │
-│    - Operation: Website crawling with semantic indexing        │
-│    - Result: 41 documents indexed and searchable               │
-│    - Status: Asynchronous (check_status.py to monitor)        │
+│ 2. INGESTION LAYER (ingest.py)                                  │
+│    - Service: GroundX Official SDK                              │
+│    - Operation: Website crawling with semantic indexing         │
+│    - Result: 41 documents indexed and searchable                │
+│    - Status: Asynchronous (check_status.py to monitor)          │
 └──────────────────────┬──────────────────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────────────────┐
-│ 3. RETRIEVAL & Q&A LAYER (chat.py)                             │
-│    - API: GroundX Search (client.search.content())             │
-│    - Input: User natural language queries                      │
-│    - Output: Relevance-ranked results with source URLs        │
-│    - Interface: Interactive headless CLI                       │
+│ 3. RETRIEVAL & Q&A LAYER (chat.py)                              │
+│    - API: GroundX Search (client.search.content())              │
+│    - Input: User natural language queries                       │
+│    - Output: Relevance-ranked results with source URLs          │
+│    - Interface: Interactive headless CLI                        │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
