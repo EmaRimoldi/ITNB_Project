@@ -1,42 +1,91 @@
 """
 GroundX Content Ingestion Module
 
-Ingests hierarchically organized ITNB website content into GroundX using the official SDK.
-Processes individual paragraphs, sections, and pages with rich metadata for better organization.
+Purpose:
+This module ingests hierarchically organized ITNB website content into GroundX's
+vector database. GroundX is a Retrieval-Augmented Generation (RAG) platform that:
+1. Indexes website content for semantic search
+2. Creates vector embeddings for efficient similarity matching
+3. Enables context retrieval for LLM-powered question answering
+
+Key Features:
+- Uses GroundX official SDK for reliable API communication
+- Supports website crawling (live scraping by GroundX)
+- Attaches rich metadata for better organization and filtering
+- Provides progress monitoring via process IDs
+- Handles hierarchical content structure from scraper
+
+Workflow:
+1. Load scraped content from local files (if available)
+2. Configure GroundX website crawling with metadata
+3. Initiate ingestion process (returns process ID)
+4. GroundX crawls, extracts, vectorizes, and indexes content
+5. Monitor status using check_status.py
 """
 
-import os
-import json
-import logging
-import time
-import sys
-from groundx import GroundX, WebsiteSource
-from dotenv import load_dotenv
+# === STANDARD LIBRARY IMPORTS ===
+import os  # Filesystem operations (path checking, reading files)
+import json  # JSON parsing for loading scraped data index
+import logging  # Structured logging for monitoring and debugging
+import time  # Time functions for progress spinner animation
+import sys  # System functions for stdout manipulation
 
-# Configure logging
+# === THIRD-PARTY IMPORTS ===
+from groundx import GroundX, WebsiteSource  # GroundX SDK for RAG platform API
+from dotenv import load_dotenv  # Load environment variables from .env file
+
+# === LOGGING CONFIGURATION ===
+# Set up logging to display timestamped messages with severity levels
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    level=logging.INFO,  # Show INFO level and above (INFO, WARNING, ERROR)
+    format='%(asctime)s - %(levelname)s - %(message)s'  # Timestamp - Level - Message
 )
+# Create logger instance for this module
 logger = logging.getLogger(__name__)
 
-# Load environment variables
+# === ENVIRONMENT VARIABLE LOADING ===
+# Load credentials and configuration from .env file
 load_dotenv()
 
-GROUNDX_API_KEY = os.getenv('GROUNDX_API_KEY')
-GROUNDX_BUCKET_ID = int(os.getenv('GROUNDX_BUCKET_ID'))
+# Retrieve GroundX API credentials from environment
+# These must be set in .env file for authentication
+GROUNDX_API_KEY = os.getenv('GROUNDX_API_KEY')  # API key for GroundX authentication
+GROUNDX_BUCKET_ID = int(os.getenv('GROUNDX_BUCKET_ID'))  # Bucket ID where content is stored (must be integer)
 
 
 def show_progress_spinner(text, duration=2):
-    """Show animated progress spinner for duration seconds"""
+    """
+    Display animated progress spinner with text for specified duration.
+    
+    This provides visual feedback to users during API calls or long operations,
+    improving perceived performance and user experience.
+    
+    Args:
+        text (str): Message to display next to spinner (e.g., "Loading...")
+        duration (int/float): How long to display spinner in seconds
+        
+    Animation:
+    Uses Unicode Braille patterns for smooth rotation effect:
+    ⠋ → ⠙ → ⠹ → ⠸ → ⠼ → ⠴ → ⠦ → ⠧ → ⠇ → ⠏ (repeats)
+    """
+    # Define spinner frames using Unicode Braille characters
+    # These create a rotating animation effect
     spinner = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+    
+    # Record start time to track duration
     start = time.time()
+    # Initialize frame counter
     i = 0
+    
+    # Keep animating until duration elapsed
     while time.time() - start < duration:
+        # Write current frame to same line (\\r = carriage return, overwrites line)
         sys.stdout.write(f'\r{spinner[i % len(spinner)]} {text}')
-        sys.stdout.flush()
-        time.sleep(0.1)
-        i += 1
+        sys.stdout.flush()  # Force immediate display (Python buffers output by default)
+        time.sleep(0.1)  # Wait 100ms before next frame (10 FPS animation)
+        i += 1  # Move to next frame
+    
+    # When done, replace spinner with checkmark to indicate completion
     sys.stdout.write(f'\r✓ {text}\n')
     sys.stdout.flush()
 

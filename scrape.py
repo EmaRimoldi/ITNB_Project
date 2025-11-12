@@ -1,76 +1,145 @@
 """
 ITNB Website Content Scraping Module
 
-Scrapes textual content from https://www.itnb.ch/en and stores it in a 
-hierarchical structure with separate files for each page, section, and paragraph.
+Purpose:
+This module scrapes textual content from https://www.itnb.ch/en and organizes it into
+a hierarchical structure. Instead of dumping all content into a single JSON file,
+it creates separate files for pages, sections, and paragraphs - making the data
+easier to navigate, update, and process for RAG ingestion.
 
-Uses BeautifulSoup for HTML parsing and organized storage instead of a single JSON blob.
+Key Features:
+- Hierarchical organization (pages → sections → paragraphs)
+- Unique ID generation for each content unit using MD5 hashing
+- Recursive crawling with depth and page limits
+- BeautifulSoup HTML parsing with content extraction
+- Structured file system storage with index
+
+Output Structure:
+scraped_data/
+  ├── pages/         Individual page JSON files (top-level pages)
+  ├── sections/      Semantic sections/topics from each page
+  ├── paragraphs/    Individual paragraph units (optimal for RAG chunking)
+  ├── index.json     Master metadata file with all IDs and relationships
+  └── complete_export.json  Full hierarchical data in one file (for reference)
 """
 
-import json
-import os
-import requests
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
-import hashlib
+# === STANDARD LIBRARY IMPORTS ===
+import json  # For reading/writing JSON data structures
+import os  # For filesystem operations (creating directories, file paths)
+import hashlib  # For generating unique MD5 hashes as content IDs
+
+# === THIRD-PARTY IMPORTS ===
+import requests  # For making HTTP requests to fetch web pages
+from bs4 import BeautifulSoup  # For parsing and navigating HTML content
+from urllib.parse import urljoin, urlparse  # For handling relative/absolute URLs
 
 
 class ITNBScraper:
     """
     Hierarchical web scraper for ITNB website.
     
-    Organization structure:
-    - scraped_data/
-      - pages/          (individual page files)
-      - sections/       (semantic sections/topics)
-      - paragraphs/     (individual paragraphs)
-      - index.json      (metadata and file index)
+    This class implements intelligent web scraping that organizes content into
+    a three-level hierarchy optimized for RAG (Retrieval-Augmented Generation):
+    
+    Organization Structure:
+    1. Pages: Top-level web pages (e.g., /en, /en/about, /en/services)
+    2. Sections: Semantic sections within pages (e.g., "Introduction", "Features")
+    3. Paragraphs: Individual text chunks (optimal for vector embedding and retrieval)
+    
+    Design Rationale:
+    - Pages provide context about where content comes from
+    - Sections group related information logically
+    - Paragraphs are the ideal granularity for RAG retrieval (not too large, not too small)
+    
+    Attributes:
+        base_url (str): Starting URL for crawling (default: https://www.itnb.ch/en)
+        max_pages (int): Maximum number of pages to scrape (prevents infinite crawling)
+        visited_urls (set): Tracks visited URLs to avoid duplicate scraping
+        pages (list): Collected page data dictionaries
+        sections (list): Collected section data dictionaries
+        paragraphs (list): Collected paragraph data dictionaries
+        index (dict): Master index with metadata and cross-references
     """
     
     def __init__(self, base_url="https://www.itnb.ch/en", max_pages=20):
-        self.base_url = base_url
-        self.max_pages = max_pages
-        self.visited_urls = set()
-        self.pages = []
-        self.sections = []
-        self.paragraphs = []
+        """
+        Initialize the ITNB scraper with configuration.
+        
+        Args:
+            base_url (str): Starting URL for crawling (should be the English version)
+            max_pages (int): Maximum pages to scrape (safety limit to prevent runaway crawling)
+        """
+        # Store configuration parameters
+        self.base_url = base_url  # Root URL to start scraping from
+        self.max_pages = max_pages  # Safety limit for number of pages
+        
+        # Initialize tracking structures
+        self.visited_urls = set()  # Prevent re-scraping same URL (deduplication)
+        
+        # Initialize data storage lists (will hold extracted content)
+        self.pages = []  # List of page dictionaries
+        self.sections = []  # List of section dictionaries
+        self.paragraphs = []  # List of paragraph dictionaries
+        
+        # Initialize master index (metadata about all scraped content)
+        # This acts as a "table of contents" for the hierarchical structure
         self.index = {
-            "base_url": base_url,
-            "total_pages": 0,
-            "total_sections": 0,
-            "total_paragraphs": 0,
-            "pages": [],
-            "sections": [],
-            "paragraphs": []
+            "base_url": base_url,  # Root URL being scraped
+            "total_pages": 0,  # Count of pages (updated after scraping)
+            "total_sections": 0,  # Count of sections (updated after scraping)
+            "total_paragraphs": 0,  # Count of paragraphs (updated after scraping)
+            "pages": [],  # List of page metadata (id, title, url)
+            "sections": [],  # List of section metadata (id, title, page_id)
+            "paragraphs": []  # List of paragraph metadata (id, section_id, page_id)
         }
     
     def scrape_website(self):
         """
-        Crawl ITNB website and extract hierarchical content.
+        Main orchestration method: Crawl ITNB website and extract hierarchical content.
+        
+        This method coordinates the entire scraping process:
+        1. Start crawling from base_url
+        2. Recursively discover and scrape linked pages
+        3. Extract and organize content hierarchically
+        4. Save all data to disk in organized structure
+        
+        Returns:
+            bool: True if scraping completed successfully, False if errors occurred
         """
+        # Display scraping configuration to user
         print(f"Starting hierarchical scraping of {self.base_url}...")
         print(f"Max pages: {self.max_pages}\n")
         
         try:
-            # Start with the main page
+            # === CRAWLING PHASE ===
+            # Start recursive crawling from the base URL with depth 0
+            # depth=0 means this is the starting page
             self._scrape_page(self.base_url, 0)
             
-            # Save all organized data
+            # === SAVING PHASE ===
+            # After crawling completes, save all collected data to disk
+            # This creates the hierarchical file structure
             self._save_organized_data()
             
+            # === SUCCESS SUMMARY ===
+            # Display statistics about what was scraped
             print(f"\n✓ Scraping completed successfully!")
-            print(f"  Pages scraped: {len(self.pages)}")
-            print(f"  Sections extracted: {len(self.sections)}")
-            print(f"  Paragraphs extracted: {len(self.paragraphs)}")
+            print(f"  Pages scraped: {len(self.pages)}")  # Number of unique pages visited
+            print(f"  Sections extracted: {len(self.sections)}")  # Number of semantic sections
+            print(f"  Paragraphs extracted: {len(self.paragraphs)}")  # Number of paragraph chunks
+            # Calculate total character count across all paragraphs
             print(f"  Total characters: {sum(len(p['content']) for p in self.paragraphs)}")
             
-            return True
+            return True  # Indicate successful scraping
             
         except Exception as e:
+            # === ERROR HANDLING ===
+            # If any error occurs during scraping, catch it and report to user
             print(f"ERROR: Scraping failed: {str(e)}")
+            # Print full stack trace for debugging
             import traceback
             traceback.print_exc()
-            return False
+            return False  # Indicate scraping failure
     
     def _scrape_page(self, url, depth, max_depth=2):
         """
