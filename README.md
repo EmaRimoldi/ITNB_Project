@@ -212,134 +212,25 @@ The chat interface allows unlimited natural language queries about ITNB content 
 
 ### Question 1: Role-Based Access Control (RBAC) Implementation
 
-**Design Overview:**
+To implement document-level access control in GroundX for an enterprise RAG system, I would use a metadata-based filtering approach combined with runtime authorization checks. This design balances security, performance, and maintainability while leveraging GroundX's native capabilities.
 
-To implement document-level access control in GroundX for an enterprise RAG system, I would use a **metadata-based filtering approach** combined with runtime authorization checks.
+The first step involves associating documents with user permissions during ingestion. When documents are ingested via the GroundX SDK, we attach permission metadata to each document using the `search_data` parameter. For example, we might tag documents with attributes like department ("sales"), access_level ("manager"), and confidentiality ("internal"). To ensure these permissions stay synchronized with organizational reality, we would maintain a separate access control database, such as PostgreSQL, that mirrors permissions from enterprise systems like SharePoint folder permissions and Azure AD group memberships. This creates a reliable source of truth that maps users to authorized departments and roles.
 
-**1. Document-User Association:**
+At query time, enforcement happens through dynamic filtering. Before processing any query, the system authenticates the user and retrieves their roles from the directory service. Using this information, we construct GroundX filter queries that restrict search results to only documents the user is authorized to access. For instance, if a user belongs to the sales department, the filter would specify `{"department": {"$in": ["sales"]}}`. For more complex scenarios involving multiple permission dimensions, we can combine filters using logical operators to check both department membership and confidentiality clearance levels simultaneously.
 
-During ingestion, attach permission metadata to each document using GroundX's `search_data` parameter:
-```python
-search_data={
-  "department": "sales",
-  "access_level": "manager",
-  "confidentiality": "internal"
-}
-```
-
-Synchronize permissions from source systems (SharePoint, Azure AD) to maintain a separate access control database (PostgreSQL) mapping users to authorized departments/roles. This ensures permissions mirror organizational structure.
-
-**2. Query-Time Enforcement:**
-
-Before each query, authenticate the user and fetch their roles. Construct dynamic GroundX filters that restrict results:
-```python
-authorized_depts = get_user_departments(user_id)
-response = client.search.content(
-  query=user_query,
-  filter={"department": {"$in": authorized_depts}}
-)
-```
-
-For complex scenarios, combine filters:
-```python
-filter={
-  "$and": [
-    {"department": user_department},
-    {"confidentiality": {"$lte": user_clearance_level}}
-  ]
-}
-```
-
-**3. Security Considerations:**
-
-- **Sync Lag**: Permission changes in source systems (user role updates) may not reflect immediately. Mitigation: Implement event-driven webhooks for real-time sync plus periodic batch reconciliation.
-- **Filter Performance**: Complex filters add latency. Mitigation: Cache user permission sets and index metadata fields.
-- **Privilege Escalation**: Never allow user-controlled filter input. Always construct filters server-side from authenticated context.
-- **Audit Compliance**: Log all queries with {user_id, query, filters_applied, timestamp} for regulatory compliance.
-- **Metadata Limitations**: Flat key-value metadata struggles with hierarchical permissions (nested groups). Consider external policy engines (e.g., Open Policy Agent) for complex rules.
-
-This architecture balances security, performance, and maintainability for enterprise-scale RBAC in RAG systems.
+Several security considerations must be addressed in this architecture. Permission synchronization lag poses a risk when users lose access in source systems but retain access in GroundX temporarily. This can be mitigated through event-driven webhooks for real-time synchronization combined with periodic batch reconciliation jobs. Filter performance can become a concern with complex permission hierarchies, so caching user permission sets and indexing metadata fields becomes essential. To prevent privilege escalation attacks, filters must always be constructed server-side from authenticated user context—never from user-supplied input. For regulatory compliance, all queries should be logged with user ID, query text, applied filters, and timestamps. Finally, GroundX's flat key-value metadata model may struggle with deeply hierarchical permissions like nested groups, so external policy engines such as Open Policy Agent might be necessary for complex enterprise rules.
 
 ---
 
 ### Question 2: Scaling RAG for Large and Dynamic Knowledge Bases
 
-**Architecture Overview:**
+For the Sovereign Orchestrator AI Concierge, I would design an event-driven, connection-based RAG system that handles thousands of frequently changing documents while empowering users through governed self-service. This architecture prioritizes real-time freshness, scalability, and intelligent automation.
 
-For the Sovereign Orchestrator AI Concierge, I would design an **event-driven, connection-based RAG system** that handles thousands of frequently changing documents while empowering users through governed self-service.
+Handling large-scale, dynamic document sets requires moving away from traditional batch processing toward event-driven ingestion. The system would connect to enterprise data sources like SharePoint, Teams, and Confluence through webhooks that capture document events in real-time—whether documents are created, modified, or deleted. These events flow into message queues such as Kafka or RabbitMQ, which decouple event arrival from processing and provide resilience against traffic spikes. The key innovation is incremental ingestion: instead of re-processing thousands of documents, the system processes only what has changed. To balance freshness with efficiency, documents are batched—processing either every 5-10 minutes or when 100 documents accumulate, whichever comes first. A changelog system maintains document hashes to detect modifications and supports versioning for audit trails and rollback capabilities.
 
-**1. Handling Large-Scale, Dynamic Document Sets:**
+User empowerment is critical, but it must be implemented through connection governance rather than manual file uploads. Instead of asking users to upload thousands of individual files, team leads and department managers should manage data source connections. For example, they can connect SharePoint folders to automatically ingest all contained documents, link Confluence spaces to synchronize knowledge bases, or authorize Teams channels to index meeting notes. This connection-based approach offers several advantages: managing 100 connections is far more scalable than managing 10,000 file uploads; connected sources automatically update while uploaded files become stale; source system permissions and audit logs are preserved; and there's a clear ownership chain from source owner to document owner to GroundX administrator. Users can connect new data sources (with IT approval), pause or resume ingestion per source, set refresh frequencies, tag documents for organization, and archive documents with recovery periods. However, they cannot directly upload files, modify source system permissions, permanently delete documents before retention periods expire, or bypass access controls.
 
-**Event-Driven Ingestion:**
-- Connect to enterprise data sources (SharePoint, Teams, Confluence) via **webhooks** to capture real-time document events (created/modified/deleted)
-- Use **message queues** (Kafka, RabbitMQ) to buffer events and enable **incremental ingestion** (process only changed documents, not entire corpus)
-- Implement **batch processing** (every 5-10 minutes or 100 documents) to balance freshness with efficiency
-
-**Change Tracking:**
-- Maintain changelog with document hashes to detect modifications
-- Support versioning for audit trails and rollback capabilities
-
-**2. User-Empowered Document Management:**
-
-**Yes, but through Connection Governance—not manual uploads:**
-
-Users (team leads, department managers) should manage **data source connections**, not individual files:
-- **Connect** SharePoint folders → auto-ingest all documents
-- **Connect** Confluence spaces → sync knowledge base
-- **Connect** Teams channels → index meeting notes
-
-**Why Connections Beat Uploads:**
-- **Scalability**: 100 connections > 10,000 file uploads
-- **Freshness**: Connected sources auto-update; uploads become stale
-- **Compliance**: Source system permissions/audit logs preserved
-- **Ownership**: Clear responsibility chain maintained
-
-**User Portal Capabilities:**
-```
-✅ Connect new data sources (with IT approval)
-✅ Pause/resume ingestion per source
-✅ Set refresh frequency (real-time/hourly/daily)
-✅ Tag/categorize documents
-✅ Archive documents (soft delete with recovery)
-
-❌ No direct file uploads
-❌ No permission bypasses
-❌ No permanent deletions (retention policy enforced)
-```
-
-**3. Algorithms & Automation for Efficiency:**
-
-**Intelligent Processing Pipeline:**
-
-- **Automated Classification**: ML agent categorizes documents on ingestion (department, document_type, sensitivity, urgency) for smart routing
-- **Metadata Enrichment**: Extract entities (people, projects, dates), topics, and summaries using NER and key-phrase extraction
-- **Semantic Deduplication**: Use embedding similarity (cosine > 0.95) to detect and merge duplicates, keeping the latest version
-- **Multi-Index Routing**: Route documents to specialized sub-indexes (HR Knowledge Base, Critical Info, Temporal Knowledge) based on classification
-- **Usage-Based Re-ranking**: Track user engagement (clicks, citations) and recompute document scores:
-  ```python
-  score = base_relevance × popularity × freshness_decay
-  ```
-- **Lifecycle Management**: Automatic archival after retention period, permanent deletion after recovery window
-
-**Multi-Agent Query Workflow:**
-```
-Query → Classification Agent (intent + routing)
-      → Authorization Agent (RBAC filters)
-      → Retrieval Agent (search with filters)
-      → Synthesis Agent (coherent answer + citations)
-```
-
-**Scalability Summary:**
-
-| Challenge | Solution |
-|-----------|----------|
-| Volume | Event-driven incremental ingestion |
-| Freshness | Real-time webhooks + message queues |
-| Management | Connection-based (not file uploads) |
-| Quality | Auto classification + deduplication |
-| Performance | Multi-index routing + usage-based ranking |
-
-This architecture scales to **millions of documents** while maintaining sub-second query latency and up-to-date content—critical for enterprise AI concierges like Sovereign Orchestrator.
+To keep retrieval efficient and up-to-date at scale, the system employs intelligent automation throughout the document lifecycle. An automated classification agent categorizes documents on ingestion—determining department, document type, sensitivity level, and urgency—which enables smart routing to specialized indexes. Metadata enrichment extracts entities like people names, project codes, and dates using named entity recognition, along with key topics and document summaries. Semantic deduplication compares document embeddings to detect near-duplicates (cosine similarity above 0.95) and automatically keeps the most recent or comprehensive version. Documents are routed to specialized sub-indexes based on their classification: HR documents go to an HR Knowledge Base, security advisories to a Critical Info high-priority index, and meeting notes to a Temporal Knowledge index with time-decay ranking. The system continuously re-ranks documents based on user engagement—tracking clicks and citations to compute relevance scores that factor in base semantic relevance, popularity, and freshness decay. Finally, lifecycle management automatically archives documents after retention periods and permanently deletes them after recovery windows expire. At query time, a multi-agent workflow orchestrates the response: a classification agent determines query intent and routing, an authorization agent applies RBAC filters, a retrieval agent searches with those filters and ranks results, and a synthesis agent combines everything into a coherent answer with citations. This architecture scales to millions of documents while maintaining sub-second query latency and up-to-date content—essential requirements for enterprise AI concierges like the Sovereign Orchestrator.
 
 ---
 
