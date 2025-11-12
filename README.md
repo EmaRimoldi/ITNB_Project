@@ -206,18 +206,18 @@ Type `exit` or `quit` to exit gracefully.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ 1. SCRAPING LAYER (scrape.py)                                  │
-│    - URL: https://www.itnb.ch/en                               │
-│    - Tool: BeautifulSoup4 (HTML parsing)                       │
-│    - Output: scraped_data/itnb_content.json                    │
+│ 1. SCRAPING LAYER (scrape.py)                                   │
+│    - URL: https://www.itnb.ch/en                                │
+│    - Tool: BeautifulSoup4 (HTML parsing)                        │
+│    - Output: scraped_data/itnb_content.json                     │
 └──────────────────────┬──────────────────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────────────────┐
-│ 2. INGESTION LAYER (ingest.py)                                 │
-│    - Service: GroundX Official SDK                             │
-│    - Operation: Website crawling with semantic indexing        │
-│    - Result: 41 documents indexed and searchable               │
-│    - Status: Asynchronous (check_status.py to monitor)        │
+│ 2. INGESTION LAYER (ingest.py)                                  │
+│    - Service: GroundX Official SDK                              │
+│    - Operation: Website crawling with semantic indexing         │
+│    - Result: 41 documents indexed and searchable                │
+│    - Status: Asynchronous (check_status.py to monitor)          │
 └──────────────────────┬──────────────────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────────────────┐
